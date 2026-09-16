@@ -19,10 +19,19 @@ class JointAngles:
 # UR3e home position
 home = np.radians([120, -90, 90, -90, -90, 0])
 
-# Hanoi tower location 
-Q11 = [120*pi/180.0, -56*pi/180.0, 124*pi/180.0, -158*pi/180.0, -90*pi/180.0, 0*pi/180.0]
-Q12 = [120*pi/180.0, -64*pi/180.0, 123*pi/180.0, -148*pi/180.0, -90*pi/180.0, 0*pi/180.0]
-Q13 = [120*pi/180.0, -72*pi/180.0, 120*pi/180.0, -137*pi/180.0, -90*pi/180.0, 0*pi/180.0]
+# Hanoi tower location ``
+# Q11 = [359.70*pi/180.0, -60.07*pi/180.0, 125.60*pi/180.0, -155.29*pi/180.0, -88.32*pi/180.0, 109.78*pi/180.0]
+Q11 = [129.74*pi/180.0, -54.87*pi/180.0, 115.76*pi/180.0, -153.33*pi/180.0, -89.73*pi/180.0, 172.56*pi/180.0]
+Q21 = [109.84*pi/180.0, -68.58*pi/180.0, 124.56*pi/180.0, -144.85*pi/180.0, -89.47*pi/180.0, 359.70*pi/180.0]
+Q31 = [111.58*pi/180.0, -75.08*pi/180.0, 121.35*pi/180.0, -136.97*pi/180.0, -92.08*pi/180.0, 359.70*pi/180.0]
+
+Q12 = [142.21*pi/180.0, -63.55*pi/180.0, 138.88*pi/180.0, -168.58*pi/180.0, -91.93*pi/180.0, 26.26*pi/180.0]
+Q22 = [142.21*pi/180.0, -75.54*pi/180.0, 137.07*pi/180.0, -152.34*pi/180.0, -90.68*pi/180.0, 33.86*pi/180.0]
+Q32 = [142.91*pi/180.0, -83*pi/180.0, 132.05*pi/180.0, -139.53*pi/180.0, -91.58*pi/180.0, 34.04*pi/180.0]
+
+Q13 = [178.45*pi/180.0, -60.82*pi/180.0, 130.09*pi/180.0, -162.20*pi/180.0, -92.30*pi/180.0, 25.24*pi/180.0]
+Q23= [178.46*pi/180.0, -69.46*pi/180.0, 126.84*pi/180.0, -148.90*pi/180.0, -92.80*pi/180.0, 20.98*pi/180.0]
+Q33 = [177.42*pi/180.0, -76.43*pi/180.0, 121.73*pi/180.0, -133.82*pi/180.0, -90.73*pi/180.0, 20.44*pi/180.0]
 
 ############## Your Code Start Here ##############
 """
@@ -30,8 +39,8 @@ TODO: Initialize Q matrix
 """
 
 Q = [ [Q11, Q12, Q13], \
-      [Q11, Q12, Q13], \
-      [Q11, Q12, Q13] ]
+      [Q21, Q22, Q23], \
+      [Q31, Q32, Q33] ]
 ############### Your Code End Here ###############
 class UR3e(Node):
     def __init__(self):
@@ -46,7 +55,7 @@ class UR3e(Node):
         ############## Your Code Start Here ##############
         # TODO: define a ROS subscriber for gripper input message and corresponding callback function
         # ROS2 gripper input topic: /io_and_status_controller/io_states
-
+        self.gripper_input_sub = self.create_subscription(IOStates, "/io_and_status_controller/io_states", self.io_state_callback, 10)
 
         ############### Your Code End Here ###############
 
@@ -84,7 +93,7 @@ class UR3e(Node):
         called.
         """
 
-        pass
+        self.analog_in_0_value = msg.analog_in_states[0].state
 
     ############### Your Code End Here ###############
 
@@ -176,6 +185,12 @@ class UR3e(Node):
     ### Hint: Use the Q array to map out your towers by location and "height".
 
         error = 0
+        mid = np.radians([147.94, -100.79, 110.47, -101.88, -92.86, 20.48])
+        self.move_arm(Q[start_height-1][start_tower-1])
+        self.set_io(0,1.0)
+        self.move_arm(mid)
+        self.move_arm(Q[end_height-1][end_tower-1])
+        self.set_io(0,0.0)
 
 
 
@@ -226,30 +241,29 @@ def main(args=None):
         # TODO: modify the code so that UR3e can move tower accordingly from user input
 
         while(loop_count > 0):
-
             node.move_arm(home)
+            node.move_block(1, 1, 3, 1)
+            # node.get_logger().info(f'Sending goal 1 ...')
 
-            node.get_logger().info(f'Sending goal 1 ...')
+            # if not node.move_arm(Q[0][0]):
+            #     node.get_logger().error("Failed to move to goal" + str(Q[0][0]))
+            #     break
 
-            if not node.move_arm(Q[0][0]):
-                node.get_logger().error("Failed to move to goal" + str(Q[0][0]))
-                break
+            # node.set_io(0, 1.0)  # Turn/ on suction
+            # # Delay to make sure suction cup has grasped the block
+            # time.sleep(1.0)
 
-            node.set_io(0, 1.0)  # Turn/ on suction
-            # Delay to make sure suction cup has grasped the block
-            time.sleep(1.0)
+            # node.get_logger().info(f'Sending goal 2 ...')
+            # if not node.move_arm(Q[1][1]):
+            #     node.get_logger().error("Failed to move to goal"+str(Q[1][1]))
+            #     break
 
-            node.get_logger().info(f'Sending goal 2 ...')
-            if not node.move_arm(Q[1][1]):
-                node.get_logger().error("Failed to move to goal"+str(Q[1][1]))
-                break
-
-            node.get_logger().info(f'Sending goal 3 ...')
-            if not node.move_arm(Q[2][2]):
-                node.get_logger().error("Failed to move to goal"+str(Q[2][2]))
-                break
-            loop_count = loop_count - 1
-            node.set_io(0, 0.0)  # Turn off suction
+            # node.get_logger().info(f'Sending goal 3 ...')
+            # if not node.move_arm(Q[2][2]):
+            #     node.get_logger().error("Failed to move to goal"+str(Q[2][2]))
+            #     break
+            # loop_count = loop_count - 1
+            # node.set_io(0, 0.0)  # Turn off suction
 
     except KeyboardInterrupt:
         pass
