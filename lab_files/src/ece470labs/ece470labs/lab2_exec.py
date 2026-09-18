@@ -23,9 +23,9 @@ home = np.radians([120, -90, 90, -90, -90, 0])
 # Hanoi tower location ``
 # Q11 = [359.70*pi/180.0, -60.07*pi/180.0, 125.60*pi/180.0, -155.29*pi/180.0, -88.32*pi/180.0, 109.78*pi/180.0]
 
-Q11 = [129.74*pi/180.0, -54.87*pi/180.0, 115.76*pi/180.0, -153.33*pi/180.0, -89.73*pi/180.0, 172.56*pi/180.0]
-Q21 = [109.84*pi/180.0, -68.58*pi/180.0, 124.56*pi/180.0, -144.85*pi/180.0, -89.47*pi/180.0, 359.70*pi/180.0]
-Q31 = [111.58*pi/180.0, -75.08*pi/180.0, 121.35*pi/180.0, -136.97*pi/180.0, -92.08*pi/180.0, 359.70*pi/180.0]
+Q11 = [152.12*pi/180.0, -40.62*pi/180.0, 83.26*pi/180.0, -134.22*pi/180.0, -89.36*pi/180.0, 138.90*pi/180.0]
+Q21 = [151.13*pi/180.0, -46.33*pi/180.0, 82.19*pi/180.0, -125.81*pi/180.0, -87.27*pi/180.0, 135.00*pi/180.0]
+Q31 = [151.13*pi/180.0, -49.48*pi/180.0, 77.03*pi/180.0, -116.00*pi/180.0, -87.75*pi/180.0, 135.00*pi/180.0]
 
 Q12 = [142.21*pi/180.0, -63.55*pi/180.0, 138.88*pi/180.0, -168.58*pi/180.0, -91.93*pi/180.0, 26.26*pi/180.0]
 Q22 = [142.21*pi/180.0, -75.54*pi/180.0, 137.07*pi/180.0, -152.34*pi/180.0, -90.68*pi/180.0, 33.86*pi/180.0]
@@ -178,8 +178,6 @@ class UR3e(Node):
                 return True
         return False
 
-
-
     def move_block(self, start_tower, start_height, end_tower, end_height):
         """Move one block between two tower positions.
 
@@ -208,23 +206,35 @@ class UR3e(Node):
             # Allow the suction cup to grip before lifting the block.
             time.sleep(0.75)
 
+            # Move to the intermediate position after picking up the block.
             if not self.move_arm(mid):
                 self.get_logger().error("Could not reach the intermediate position")
                 return False
+
+            # Move to the block drop position.
             if not self.move_arm(Q[end_height - 1][end_tower - 1]):
                 self.get_logger().error("Could not reach the block drop position")
                 return False
 
+            # Release the block.
             response = self.set_io(0, 0.0)
             if response is None or not getattr(response, "success", True):
                 self.get_logger().error("Could not turn suction off")
                 return False
 
             suction_on = False
+
+            # Return to the intermediate position after dropping the block.
+            if not self.move_arm(mid):
+                self.get_logger().error("Could not return to the intermediate position")
+                return False
+
             return True
+
         except Exception as exc:
             self.get_logger().error(f"Block move failed: {exc}")
             return False
+
         finally:
             # Do not leave the gripper on after a failed move.
             if suction_on:
@@ -232,6 +242,60 @@ class UR3e(Node):
                     self.set_io(0, 0.0)
                 except Exception as exc:
                     self.get_logger().error(f"Could not release suction: {exc}")
+
+
+    # def move_block(self, start_tower, start_height, end_tower, end_height):
+    #     """Move one block between two tower positions.
+
+    #     Tower and height numbers are one-based and index the Q waypoint table.
+    #     """
+    #     if start_tower not in (1, 2, 3) or end_tower not in (1, 2, 3):
+    #         raise ValueError("tower numbers must be 1, 2, or 3")
+    #     if start_height not in (1, 2, 3) or end_height not in (1, 2, 3):
+    #         raise ValueError("tower heights must be 1, 2, or 3")
+    #     if start_tower == end_tower:
+    #         raise ValueError("start and end towers must be different")
+
+    #     mid = np.radians([147.94, -100.79, 110.47, -101.88, -92.86, 20.48])
+
+    #     if not self.move_arm(Q[start_height - 1][start_tower - 1]):
+    #         self.get_logger().error("Could not reach the block pickup position")
+    #         return False
+
+    #     suction_on = True
+    #     try:
+    #         response = self.set_io(0, 1.0)
+    #         if response is None or not getattr(response, "success", True):
+    #             self.get_logger().error("Could not turn suction on")
+    #             return False
+
+    #         # Allow the suction cup to grip before lifting the block.
+    #         time.sleep(0.75)
+
+    #         if not self.move_arm(mid):
+    #             self.get_logger().error("Could not reach the intermediate position")
+    #             return False
+    #         if not self.move_arm(Q[end_height - 1][end_tower - 1]):
+    #             self.get_logger().error("Could not reach the block drop position")
+    #             return False
+
+    #         response = self.set_io(0, 0.0)
+    #         if response is None or not getattr(response, "success", True):
+    #             self.get_logger().error("Could not turn suction off")
+    #             return False
+
+    #         suction_on = False
+    #         return True
+    #     except Exception as exc:
+    #         self.get_logger().error(f"Block move failed: {exc}")
+    #         return False
+    #     finally:
+    #         # Do not leave the gripper on after a failed move.
+    #         if suction_on:
+    #             try:
+    #                 self.set_io(0, 0.0)
+    #             except Exception as exc:
+    #                 self.get_logger().error(f"Could not release suction: {exc}")
 
 
     def build_tower(self, start_tower, end_tower, num_blocks=3):
