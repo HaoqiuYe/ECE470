@@ -10,8 +10,6 @@ from ur_msgs.msg import IOStates
 import time
 import numpy as np
 from math import pi
-import sys
-import argparse
 class JointAngles:
     def __init__(self):
         self.name = ["", "", "", "", "", ""]  #could have also done [""] * 6
@@ -23,9 +21,9 @@ home = np.radians([120, -90, 90, -90, -90, 0])
 # Hanoi tower location ``
 # Q11 = [359.70*pi/180.0, -60.07*pi/180.0, 125.60*pi/180.0, -155.29*pi/180.0, -88.32*pi/180.0, 109.78*pi/180.0]
 
-Q11 = [129.74*pi/180.0, -54.87*pi/180.0, 115.76*pi/180.0, -153.33*pi/180.0, -89.73*pi/180.0, 172.56*pi/180.0]
-Q21 = [109.84*pi/180.0, -68.58*pi/180.0, 124.56*pi/180.0, -144.85*pi/180.0, -89.47*pi/180.0, 359.70*pi/180.0]
-Q31 = [111.58*pi/180.0, -75.08*pi/180.0, 121.35*pi/180.0, -136.97*pi/180.0, -92.08*pi/180.0, 359.70*pi/180.0]
+Q11 = [152.12*pi/180.0, -40.62*pi/180.0, 83.26*pi/180.0, -134.22*pi/180.0, -89.36*pi/180.0, 138.90*pi/180.0]
+Q21 = [151.13*pi/180.0, -46.33*pi/180.0, 82.19*pi/180.0, -125.81*pi/180.0, -87.27*pi/180.0, 135.00*pi/180.0]
+Q31 = [151.13*pi/180.0, -49.48*pi/180.0, 77.03*pi/180.0, -116.00*pi/180.0, -87.75*pi/180.0, 135.00*pi/180.0]
 
 Q12 = [142.21*pi/180.0, -63.55*pi/180.0, 138.88*pi/180.0, -168.58*pi/180.0, -91.93*pi/180.0, 26.26*pi/180.0]
 Q22 = [142.21*pi/180.0, -75.54*pi/180.0, 137.07*pi/180.0, -152.34*pi/180.0, -90.68*pi/180.0, 33.86*pi/180.0]
@@ -181,110 +179,24 @@ class UR3e(Node):
 
 
     def move_block(self, start_tower, start_height, end_tower, end_height):
-        """Move one block between two tower positions.
+        global Q
+    ############## Your Code Start Here ##############
+    # TODO: add code to move block from start tower and height to end tower and height
+    ### Hint: Use the Q array to map out your towers by location and "height".
 
-        Tower and height numbers are one-based and index the Q waypoint table.
-        """
-        if start_tower not in (1, 2, 3) or end_tower not in (1, 2, 3):
-            raise ValueError("tower numbers must be 1, 2, or 3")
-        if start_height not in (1, 2, 3) or end_height not in (1, 2, 3):
-            raise ValueError("tower heights must be 1, 2, or 3")
-        if start_tower == end_tower:
-            raise ValueError("start and end towers must be different")
-
+        error = 0
         mid = np.radians([147.94, -100.79, 110.47, -101.88, -92.86, 20.48])
-
-        if not self.move_arm(Q[start_height - 1][start_tower - 1]):
-            self.get_logger().error("Could not reach the block pickup position")
-            return False
-
-        suction_on = True
-        try:
-            response = self.set_io(0, 1.0)
-            if response is None or not getattr(response, "success", True):
-                self.get_logger().error("Could not turn suction on")
-                return False
-
-            # Allow the suction cup to grip before lifting the block.
-            time.sleep(0.75)
-
-            if not self.move_arm(mid):
-                self.get_logger().error("Could not reach the intermediate position")
-                return False
-            if not self.move_arm(Q[end_height - 1][end_tower - 1]):
-                self.get_logger().error("Could not reach the block drop position")
-                return False
-
-            response = self.set_io(0, 0.0)
-            if response is None or not getattr(response, "success", True):
-                self.get_logger().error("Could not turn suction off")
-                return False
-
-            suction_on = False
-            return True
-        except Exception as exc:
-            self.get_logger().error(f"Block move failed: {exc}")
-            return False
-        finally:
-            # Do not leave the gripper on after a failed move.
-            if suction_on:
-                try:
-                    self.set_io(0, 0.0)
-                except Exception as exc:
-                    self.get_logger().error(f"Could not release suction: {exc}")
+        self.move_arm(Q[start_height-1][start_tower-1])
+        self.set_io(0,1.0)
+        self.move_arm(mid)
+        self.move_arm(Q[end_height-1][end_tower-1])
+        self.set_io(0,0.0)
 
 
-    def build_tower(self, start_tower, end_tower, num_blocks=3):
-        """Move a complete Tower of Hanoi stack from start to end.
 
-        The initial state contains ``num_blocks`` stacked on ``start_tower``;
-        the final state contains all of them on ``end_tower``.  The waypoint
-        table supports one through three blocks.
-        """
-        if start_tower not in (1, 2, 3) or end_tower not in (1, 2, 3):
-            raise ValueError("tower numbers must be 1, 2, or 3")
-        if start_tower == end_tower:
-            raise ValueError("start and end towers must be different")
-        if not isinstance(num_blocks, int) or not 1 <= num_blocks <= 3:
-            raise ValueError("num_blocks must be an integer from 1 through 3")
+        return error
 
-        auxiliary_tower = 6 - start_tower - end_tower
-        tower_heights = [0, 0, 0]
-        tower_heights[start_tower - 1] = num_blocks
-
-        def solve(num_to_move, source, destination, auxiliary):
-            if num_to_move == 0:
-                return True
-
-            # Move the smaller stack out of the way first.
-            if not solve(num_to_move - 1, source, auxiliary, destination):
-                return False
-
-            source_index = source - 1
-            destination_index = destination - 1
-            source_height = tower_heights[source_index]
-            destination_height = tower_heights[destination_index] + 1
-
-            if source_height < 1 or destination_height > 3:
-                self.get_logger().error("Invalid Tower of Hanoi state")
-                return False
-
-            # The next disk is now exposed at the top of source.
-            if not self.move_block(
-                source, source_height, destination, destination_height
-            ):
-                return False
-
-            tower_heights[source_index] -= 1
-            tower_heights[destination_index] += 1
-
-            # Put the smaller stack on top of the disk just moved.
-            return solve(num_to_move - 1, auxiliary, destination, source)
-
-        solved = solve(num_blocks, start_tower, end_tower, auxiliary_tower)
-        solved = solved and tower_heights[start_tower - 1] == 0
-        solved = solved and tower_heights[end_tower - 1] == num_blocks
-        return solved
+    ############### Your Code End Here ###############
 
 
 def main(args=None):
@@ -306,31 +218,81 @@ def main(args=None):
         time.sleep(0.5)
 
     try:
-        parser = argparse.ArgumentParser()
-        parser.add_argument(
-            "--start", type=int, choices=(1, 2, 3), required=True,
-            help="Starting tower position"
-        )
-        parser.add_argument(
-            "--end", type=int, choices=(1, 2, 3), required=True,
-            help="Destination tower position"
-        )
+        start_tower = int(input("Enter starting tower position (1, 2, or 3): "))
+        end_tower = int(input("Enter ending tower position (1, 2, or 3): "))
 
-        cli_args = parser.parse_args()
-        print(f"Start: {cli_args.start}, End: {cli_args.end}")
+        if start_tower not in (1, 2, 3):
+            raise ValueError("starting tower must be 1, 2, or 3")
+        if end_tower not in (1, 2, 3):
+            raise ValueError("ending tower must be 1, 2, or 3")
+        if start_tower == end_tower:
+            raise ValueError("starting and ending towers must be different")
+
+        print(f"Starting tower: {start_tower}")
+        print(f"Ending tower: {end_tower}")
 
         if not node.move_arm(home):
-            node.get_logger().error("Could not move to the home position")
-        elif node.build_tower(cli_args.start, cli_args.end):
-            node.get_logger().info(
-                f"Successfully moved the tower from {cli_args.start} "
-                f"to {cli_args.end}"
-            )
-        else:
-            node.get_logger().error("Tower of Hanoi execution failed")
+            node.get_logger().error("Could not reach the task starting position")
+            return
+
+        # Three-block Tower of Hanoi: explicitly handle each possible
+        # starting and ending tower using move_block only.
+        if start_tower == 1 and end_tower == 2:
+            node.move_block(1, 3, 2, 1)
+            node.move_block(1, 2, 3, 1)
+            node.move_block(2, 1, 3, 2)
+            node.move_block(1, 1, 2, 1)
+            node.move_block(3, 2, 1, 1)
+            node.move_block(3, 1, 2, 2)
+            node.move_block(1, 1, 2, 3)
+
+        elif start_tower == 1 and end_tower == 3:
+            node.move_block(1, 3, 3, 1)
+            node.move_block(1, 2, 2, 1)
+            node.move_block(3, 1, 2, 2)
+            node.move_block(1, 1, 3, 1)
+            node.move_block(2, 2, 1, 1)
+            node.move_block(2, 1, 3, 2)
+            node.move_block(1, 1, 3, 3)
+
+        elif start_tower == 2 and end_tower == 1:
+            node.move_block(2, 3, 1, 1)
+            node.move_block(2, 2, 3, 1)
+            node.move_block(1, 1, 3, 2)
+            node.move_block(2, 1, 1, 1)
+            node.move_block(3, 2, 2, 1)
+            node.move_block(3, 1, 1, 2)
+            node.move_block(2, 1, 1, 3)
+
+        elif start_tower == 2 and end_tower == 3:
+            node.move_block(2, 3, 3, 1)
+            node.move_block(2, 2, 1, 1)
+            node.move_block(3, 1, 1, 2)
+            node.move_block(2, 1, 3, 1)
+            node.move_block(1, 2, 2, 1)
+            node.move_block(1, 1, 3, 2)
+            node.move_block(2, 1, 3, 3)
+
+        elif start_tower == 3 and end_tower == 1:
+            node.move_block(3, 3, 1, 1)
+            node.move_block(3, 2, 2, 1)
+            node.move_block(1, 1, 2, 2)
+            node.move_block(3, 1, 1, 1)
+            node.move_block(2, 2, 3, 1)
+            node.move_block(2, 1, 1, 2)
+            node.move_block(3, 1, 1, 3)
+
+        elif start_tower == 3 and end_tower == 2:
+            node.move_block(3, 3, 2, 1)
+            node.move_block(3, 2, 1, 1)
+            node.move_block(2, 1, 1, 2)
+            node.move_block(3, 1, 2, 1)
+            node.move_block(1, 2, 3, 1)
+            node.move_block(1, 1, 2, 2)
+            node.move_block(3, 1, 2, 3)
 
     except ValueError as exc:
-        node.get_logger().error(f"Invalid tower input: {exc}")
+        print(f"Invalid tower input: {exc}")
     except KeyboardInterrupt:
         pass
     finally:
