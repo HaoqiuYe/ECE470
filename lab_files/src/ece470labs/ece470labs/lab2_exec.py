@@ -188,6 +188,12 @@ class UR3e(Node):
         mid = np.radians([147.94, -100.79, 110.47, -101.88, -92.86, 20.48])
         self.move_arm(Q[start_height-1][start_tower-1])
         self.set_io(0,1.0)
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.1)
+        if self.analog_in_0_value <= 2:
+            self.get_logger().error("No block attached after waiting for suction; stopping.")
+            raise SystemExit(1)
         self.move_arm(mid)
         self.move_arm(Q[end_height-1][end_tower-1])
         self.set_io(0,0.0)
