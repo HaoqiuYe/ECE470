@@ -103,7 +103,7 @@ def lab_fk(theta1, theta2, theta3, theta4, theta5, theta6):
 	M, S = Get_MS()
 	temp = M.copy()
 	for i in range(6):
-		temp = expm(VecTose3(S[:, 5-i]) *  np.radians(t[5-i])) @ temp 
+		temp = expm(VecTose3(S[:, 5-i]) *  (t[5-i])) @ temp 
 
 	print()
 	print(str(temp) + "\n")
