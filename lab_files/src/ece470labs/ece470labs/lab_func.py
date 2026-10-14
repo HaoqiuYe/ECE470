@@ -134,6 +134,42 @@ def lab_invk(xWgrip, yWgrip, zWgrip, yaw_WgripDegree):
 	theta5 = 0.0
 	theta6 = 0.0
 	
+	x0grip = xWgrip - 150
+	y0grip = yWgrip - 150
+	z0grip = zWgrip -10
+
+	alu_plate_length = 53.5
+
+	xcen = xWgrip - np.cos(alu_plate_length)
+	ycen = yWgrip - np.sin(alu_plate_length)
+	zcen = zWgrip
+
+	f = (xcen**2 + ycen**2)**0.5
+	h = np.arctan2(ycen, xcen)
+	b = np.arccos((l6+27)/f)
+	theta1 = h - b
+
+	
+	theta6 = np.radian(90 + theta1 - yaw_WgripDegree)
+
+	mid = np.cos(b) * f
+	x3end = xcen
+	y3end = np.tan(theta1) * xcen
+	z3end = zcen + l8 + 59
+
+	c = (x3end**2 + y3end**2+(z3end - l1)**2)**0.5
+
+	theta3 = 180 - (np.arccos(((l3**2) + (l5**2)- c**2)/ (2*l3*l5)) )
+
+	
+
+
+
+
+
+
+
+
 	# ==============================================================#
 	return lab_fk(theta1, theta2, theta3, theta4, theta5, theta6)
 
