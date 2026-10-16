@@ -125,53 +125,56 @@ def lab_fk(theta1, theta2, theta3, theta4, theta5, theta6):
 Function that calculates an elbow up Inverse Kinematic solution for the UR3
 """
 def lab_invk(xWgrip, yWgrip, zWgrip, yaw_WgripDegree):
-	# =================== Your code starts here ====================#
-	
-	theta1 = 0.0
-	theta2 = 0.0
-	theta3 = 0.0
-	theta4 = 0.0
-	theta5 = 0.0
-	theta6 = 0.0
-	
-	x0grip = xWgrip - 150
-	y0grip = yWgrip - 150
-	z0grip = zWgrip -10
+    # Position inputs are in meters; yaw is in degrees.
+    # Internal distances are in mm to match link lengths.
 
-	alu_plate_length = 53.5
+    # 1. Convert world coordinates to robot base coordinates.
+    x0grip = 1000 * xWgrip + 150
+    y0grip = 1000 * yWgrip - 150
+    z0grip = 1000 * zWgrip - 10
 
-	xcen = xWgrip - np.cos(alu_plate_length)
-	ycen = yWgrip - np.sin(alu_plate_length)
-	zcen = zWgrip
+    yaw = np.deg2rad(yaw_WgripDegree)
 
-	f = (xcen**2 + ycen**2)**0.5
-	h = np.arctan2(ycen, xcen)
-	b = np.arccos((l6+27)/f)
-	theta1 = h - b
+    # 2. Find the virtual wrist center.
+    alu_plate_length = 53.5
 
-	
-	theta6 = np.radian(90 + theta1 - yaw_WgripDegree)
+    xcen = x0grip - alu_plate_length * np.cos(yaw)
+    ycen = y0grip - alu_plate_length * np.sin(yaw)
+    zcen = z0grip
 
-	mid = np.cos(b) * f
-	x3end = xcen
-	y3end = np.tan(theta1) * xcen
-	z3end = zcen + l8 + 59
+    # 3. Solve for theta1 using the top view.
+    d = l2 - l4 + l6       # 131 mm sideways offset
+    f = np.sqrt(xcen**2 + ycen**2)
 
-	c = (x3end**2 + y3end**2+(z3end - l1)**2)**0.5
+    theta1 = np.arctan2(ycen, xcen) - np.arcsin(d / f)
 
-	theta3 = 180 - (np.arccos(((l3**2) + (l5**2)- c**2)/ (2*l3*l5)) )
+    # 4. Solve for theta6 using the desired yaw.
+    theta6 = pi / 2 + theta1 - yaw
 
-	
+    # 5. Find the projected endpoint of the two-link arm.
+    x3end = xcen + d * np.sin(theta1) - l7 * np.cos(theta1)
+    y3end = ycen - d * np.cos(theta1) - l7 * np.sin(theta1)
+    z3end = zcen + l8 + 59
 
+    # 6. Solve the side-view triangle for the elbow-up configuration.
+    r = x3end * np.cos(theta1) + y3end * np.sin(theta1)
+    s = z3end - l1
+    c = np.sqrt(r**2 + s**2)
 
+    theta3 = pi - np.arccos(
+        (l3**2 + l5**2 - c**2) / (2 * l3 * l5)
+    )
 
+    beta = np.arccos(
+        (l3**2 + c**2 - l5**2) / (2 * l3 * c)
+    )
 
+    theta2 = -np.arctan2(s, r) - beta
+    theta4 = -theta2 - theta3
+    theta5 = -pi / 2
 
-
-
-
-	# ==============================================================#
-	return lab_fk(theta1, theta2, theta3, theta4, theta5, theta6)
+    # 7. Pass the angles to lab_fk, which applies controller offsets.
+    return lab_fk(theta1, theta2, theta3, theta4, theta5, theta6)
 
 def main(args=None):
 	lab_fk(-46.73, -75.65, 98.23, -59.53, -112.40,89.88)
