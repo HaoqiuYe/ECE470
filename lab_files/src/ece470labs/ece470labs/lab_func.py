@@ -125,38 +125,35 @@ def lab_fk(theta1, theta2, theta3, theta4, theta5, theta6):
 Function that calculates an elbow up Inverse Kinematic solution for the UR3
 """
 def lab_invk(xWgrip, yWgrip, zWgrip, yaw_WgripDegree):
-    # Position inputs are in meters; yaw is in degrees.
-    # Internal distances are in mm to match link lengths.
-
-    # 1. Convert world coordinates to robot base coordinates.
+  
     x0grip = 1000 * xWgrip + 150
     y0grip = 1000 * yWgrip - 150
     z0grip = 1000 * zWgrip - 10
 
     yaw = np.deg2rad(yaw_WgripDegree)
 
-    # 2. Find the virtual wrist center.
+    
     alu_plate_length = 53.5
 
     xcen = x0grip - alu_plate_length * np.cos(yaw)
     ycen = y0grip - alu_plate_length * np.sin(yaw)
     zcen = z0grip
 
-    # 3. Solve for theta1 using the top view.
+    
     d = l2 - l4 + l6       # 131 mm sideways offset
     f = np.sqrt(xcen**2 + ycen**2)
 
     theta1 = np.arctan2(ycen, xcen) - np.arcsin(d / f)
 
-    # 4. Solve for theta6 using the desired yaw.
+ 
     theta6 = pi / 2 + theta1 - yaw
 
-    # 5. Find the projected endpoint of the two-link arm.
+   
     x3end = xcen + d * np.sin(theta1) - l7 * np.cos(theta1)
     y3end = ycen - d * np.cos(theta1) - l7 * np.sin(theta1)
     z3end = zcen + l8 + 59
 
-    # 6. Solve the side-view triangle for the elbow-up configuration.
+   
     r = x3end * np.cos(theta1) + y3end * np.sin(theta1)
     s = z3end - l1
     c = np.sqrt(r**2 + s**2)

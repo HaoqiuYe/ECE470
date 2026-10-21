@@ -1,0 +1,43 @@
+haoqiuy2@eceb-3071-l07:~/ECE470Labs/lab_files$ ros2 run ece470labs lab4_exec 0.18 -0.1 0.06 -45
+Check if the UR3e is in 'Remote' Mode?
+    Check if the UR3e is initialized and in 'Normal' state.
+    Have you run the ROS2 launch statement?
+    If there was an UR3e emergency stop or error, Ctrl-C the ros2 launch and rerun.
+    
+    Press <Enter> to Continue.
+[INFO] [1792610101.654565071] [ur3e]: Waiting for initial state updates...
+
+xWgrip: 0.18, yWgrip: -0.1, zWgrip: 0.06, yaw_WgripDegree: -45
+
+Foward kinematics calculated:
+
+
+[[ 7.07106781e-01  7.07106781e-01 -4.82158938e-16  1.80000000e+02]
+ [-7.07106781e-01  7.07106781e-01  3.17431394e-16 -1.00000000e+02]
+ [ 4.52919959e-16  2.55962086e-17  1.00000000e+00  6.00000000e+01]
+ [ 2.47511899e-18  1.04784213e-18  1.19909715e-18  1.00000000e+00]]
+
+[INFO] [1792610102.157582878] [ur3e]: Moving to position: [ 122.74110329  -61.35864394  112.19283558 -140.83419165  -90.
+   77.74110329]
+haoqiuy2@eceb-3071-l07:~/ECE470Labs/lab_files$ ros2 run ece470labs lab4_exec 0.27 0.33 0.23 90
+Check if the UR3e is in 'Remote' Mode?
+    Check if the UR3e is initialized and in 'Normal' state.
+    Have you run the ROS2 launch statement?
+    If there was an UR3e emergency stop or error, Ctrl-C the ros2 launch and rerun.
+    
+    Press <Enter> to Continue.
+[INFO] [1792610142.437436303] [ur3e]: Waiting for initial state updates...
+
+xWgrip: 0.27, yWgrip: 0.33, zWgrip: 0.23, yaw_WgripDegree: 90
+
+Foward kinematics calculated:
+
+
+[[-1.65522257e-16 -1.00000000e+00 -3.37997560e-17  2.70000000e+02]
+ [ 1.00000000e+00 -8.22503012e-17  3.05634583e-18  3.30000000e+02]
+ [ 4.14501392e-16  1.59396066e-16  1.00000000e+00  2.30000000e+02]
+ [ 8.93153002e-19  2.16762782e-18 -1.66428124e-18  1.00000000e+00]]
+
+[INFO] [1792610142.940194856] [ur3e]: Moving to position: [179.38511109 -60.34319423  58.46989844 -88.12670421 -90.
+  -0.61488891]
+
