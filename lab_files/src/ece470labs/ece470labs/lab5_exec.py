@@ -223,7 +223,9 @@ def main(args=None):
 
         # Execute task once based on snapshot
         # ========================= Student's code starts here =========================
-
+        # Or = 240
+        # Oc = 320
+        # beta =  600px/m
         """
         TODO: Use the vision-detected block positions to move blocks around. 
         Hints: use the found green_blocks, yellow_blocks to move the blocks correspondingly. You will

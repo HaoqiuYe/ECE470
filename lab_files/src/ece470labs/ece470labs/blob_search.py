@@ -25,11 +25,13 @@ def blob_search(image_raw, color):
     # ========================= Student's code starts here =========================
 
     # Filter by Color
-    params.filterByColor = False
+    params.filterByColor = True
+    params.blobColor = 255
 
     # Filter by Area.
-    params.filterByArea = False
-
+    params.filterByArea = True
+    params.minArea = 200
+    params.maxArea = 600
     # Filter by Circularity
     params.filterByCircularity = False
 
@@ -52,8 +54,14 @@ def blob_search(image_raw, color):
     lower = (110,50,50)     # blue lower
     upper = (130,255,255)   # blue upper
 
+    lower_y =(20, 175, 100)
+    upper_y = (30, 255, 255)
+
+    lower_g = (35,50,50)
+    upper_g = (85,255,255)
+
     # Define a mask using the lower and upper bounds of the target color
-    mask_image = cv2.inRange(hsv_image, lower, upper)
+    mask_image = cv2.inRange(hsv_image, lower_y,upper_y)
 
     # ========================= Student's code ends here ===========================
 
@@ -68,7 +76,7 @@ def blob_search(image_raw, color):
     # ========================= Student's code starts here =========================
 
     # Draw the keypoints on the detected block
-    # im_with_keypoints = cv2.drawKeypoints(image_raw, keypoints, ???)
+    im_with_keypoints = cv2.drawKeypoints(image_raw, keypoints, mask_image)
 
     # ========================= Student's code ends here ===========================
 
@@ -86,8 +94,8 @@ def blob_search(image_raw, color):
     cv2.imshow("Camera View", image_raw)
     cv2.namedWindow("Mask View")
     cv2.imshow("Mask View", mask_image)
-    # cv2.namedWindow("Keypoint View")
-    # cv2.imshow("Keypoint View", im_with_keypoints)
+    cv2.namedWindow("Keypoint View")
+    cv2.imshow("Keypoint View", im_with_keypoints)
 
     cv2.waitKey(2)
 
