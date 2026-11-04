@@ -13,21 +13,20 @@ ty = 0.0
 
 # Function that converts image coord to world coord
 def IMG2W(col, row):
-    #  # Execute task once based on snapshot
-    #     # ========================= Student's code starts here =========================
-    #     # Or = 240
-    #     # Oc = 320
-    #     # beta =  600px/m
-    # or = 240
-    # oc = 320
-    # beta = 600
-    # xc_r = (row - or) / beta
-    # yc_c = (col - oc) / beta
-    # tx = 
-    # ty = 
-    # r
-    # xw = 
-    # yw = 
+    
+    or = 240
+    oc = 320
+    beta = 600
+    xc_r = (row - or) / beta
+    yc_c = (col - oc) / beta
+    tx = 0.192
+    ty = 0.07
+    theta = 0.0996
+    
+
+    r
+    xw = 
+    yw = 
     pass
 
 
