@@ -30,6 +30,14 @@ home = np.radians([120, -90, 90, -90, -90, 0])
 # Position for UR3 not blocking the camera
 go_away = [270*pi/180.0, -90*pi/180.0, 90*pi/180.0, -90*pi/180.0, -90*pi/180.0, 135*pi/180.0]
 
+# World-frame distances are in meters; lab_invk takes yaw in degrees.
+STACK_XY = (0.300, 0.050)
+TABLE_Z = 0.0
+CUBE_HEIGHT = 0.031
+TRAVEL_Z = 0.180
+GRIPPER_YAW_DEG = 0.0
+SUCTION_THRESHOLD = 2.0  # Same Analog Input 0 threshold used in Lab 2.
+
 class UR3e(Node):
     def __init__(self):
         super().__init__('ur3e')
@@ -53,9 +61,8 @@ class UR3e(Node):
         self.image_sub = self.create_subscription(Image, '/image_raw', self.image_callback, qos_profile_sensor_data)
 
         self.image_count = 0
-        # store world coordinates for blocks (same idea as xw_yw_G, xw_yw_Y in lab5)
-        self.green_blocks = []   # list of (x, y) or (x, y, z)
-        self.yellow_blocks = []  # adjust to your needs
+        # Store detected yellow block centers as world-frame (x, y) coordinates.
+        self.yellow_blocks = []
 
 
         # State variables
@@ -98,8 +105,8 @@ class UR3e(Node):
         # cv2.line(cv_image, (0,50), (640,50), (0,0,0), 5)
 
         # Use your existing blob_search to detect block centers in world frame
-        self.green_blocks = blob_search(cv_image, "green")
         self.yellow_blocks = blob_search(cv_image, "yellow")
+        self.image_count += 1
 
 
 
@@ -184,11 +191,74 @@ class UR3e(Node):
 
 
     def move_block_vision(self, start_xy, target_xyz):
-        """TODO: Pick block at start_xy and place it at target_xy, both in world frame.
-        Hint: You can use your existing lab_invk, move_arm and set_io to pick and place a block.
+        """Pick a table-level cube and place its top at target_xyz in world meters.
+
+        Return False for a missing block so main can continue with the snapshot.
+        Raise RuntimeError for motion or I/O failures to stop further transfers.
         """
         # ========================= Student's code starts here =========================
-        pass
+        start_x, start_y = start_xy
+        target_x, target_y, target_z = target_xyz
+        pick_z = TABLE_Z + CUBE_HEIGHT
+        travel_z = max(TRAVEL_Z, target_z + 0.080)
+
+        # lab_invk already calls lab_fk to apply the controller angle offsets.
+        pick_above = lab_invk(start_x, start_y, travel_z, GRIPPER_YAW_DEG)
+        pick = lab_invk(start_x, start_y, pick_z, GRIPPER_YAW_DEG)
+        place_above = lab_invk(target_x, target_y, travel_z, GRIPPER_YAW_DEG)
+        place = lab_invk(target_x, target_y, target_z, GRIPPER_YAW_DEG)
+        if not np.isfinite([pick_above, pick, place_above, place]).all():
+            raise RuntimeError("Pick or place position is outside the IK workspace")
+
+        def move_to(joints, description):
+            if not self.move_arm(joints):
+                raise RuntimeError(f"Could not {description}")
+
+        def suction(state):
+            response = self.set_io(0, state)
+            if response is None or not response.success:
+                raise RuntimeError(f"Could not set suction to {state}")
+
+        def settle(seconds):
+            deadline = time.monotonic() + seconds
+            while rclpy.ok() and time.monotonic() < deadline:
+                rclpy.spin_once(self, timeout_sec=0.1)
+            if not rclpy.ok():
+                raise RuntimeError("ROS shut down during the block transfer")
+
+        suction(0.0)
+        move_to(pick_above, "move above the pickup position")
+        move_to(pick, "reach the pickup position")
+        suction(1.0)
+
+        # Require new feedback after suction starts; keep processing callbacks.
+        self.analog_in_0_value = None
+        settle(2.0)
+        if self.analog_in_0_value is None:
+            suction(0.0)
+            raise RuntimeError("No gripper feedback received after enabling suction")
+        if self.analog_in_0_value <= SUCTION_THRESHOLD:
+            self.get_logger().error(
+                f"No block attached at ({start_x:.3f}, {start_y:.3f}); skipping it"
+            )
+            suction(0.0)
+            move_to(pick_above, "retract after the missed pickup")
+            return False
+
+        move_to(pick_above, "lift the block above the pickup position")
+        if self.analog_in_0_value <= SUCTION_THRESHOLD:
+            self.get_logger().error(
+                f"Block lost while lifting at ({start_x:.3f}, {start_y:.3f}); skipping it"
+            )
+            suction(0.0)
+            return False
+
+        move_to(place_above, "move above the stack")
+        move_to(place, "lower the block onto the stack")
+        suction(0.0)
+        settle(0.5)
+        move_to(place_above, "retract above the stack")
+        return True
         # ========================= Student's code ends here =========================
 
 
@@ -208,45 +278,57 @@ def main(args=None):
         # Wait for joint state updates
         while rclpy.ok() and node.current_joint_state is None:
             rclpy.spin_once(node, timeout_sec=0.1)
+        if not rclpy.ok():
+            return
 
         # Move to go_away (your move_arm uses rclpy.spin_once internally)
-        node.move_arm(go_away)
+        if not node.move_arm(go_away):
+            raise RuntimeError("Could not move the robot out of the camera view")
 
         # Let vision settle for 5 seconds
-        settle_start = time.time()
-        while rclpy.ok() and (time.time() - settle_start < 5.0):
+        image_count_before_settle = node.image_count
+        settle_start = time.monotonic()
+        while rclpy.ok() and (time.monotonic() - settle_start < 5.0):
             rclpy.spin_once(node, timeout_sec=0.1)
+        if not rclpy.ok():
+            return
+        if node.image_count == image_count_before_settle:
+            raise RuntimeError("No camera image received during the five-second wait")
 
-        # Snapshot once 
-        green_snapshot = list(node.green_blocks)
-        node.get_logger().info(f"Snapshot green blocks: {green_snapshot}")
-
-        # Execute task once based on snapshot
         # ========================= Student's code starts here =========================
-        # Or = 240
-        # Oc = 320
-        # beta =  600px/m
-        """
-        TODO: Use the vision-detected block positions to move blocks around. 
-        Hints: use the found green_blocks, yellow_blocks to move the blocks correspondingly. You will
-        need to call move_block_vision(start_xy, target_xyz) where start_xy is the world coordinate of 
-        the block you want to move, and target_xyz is the world coordinate of where you want to place it 
-        (you can set z based on your needs).
-        """
+        # Freeze the yellow block positions before the arm obscures the camera.
+        block_snapshot = [tuple(xy) for xy in node.yellow_blocks]
+
+        node.get_logger().info(f"Snapshot yellow blocks: {block_snapshot}")
+        placed_count = 0
+        for start_xy in block_snapshot:
+            # z is the suction-cup contact height at the top of the placed cube.
+            target_z = TABLE_Z + (placed_count + 1) * CUBE_HEIGHT
+            target_xyz = (STACK_XY[0], STACK_XY[1], target_z)
+            if node.move_block_vision(start_xy, target_xyz):
+                placed_count += 1
+                node.get_logger().info(
+                    f"Placed yellow block {placed_count} at {target_xyz}"
+                )
 
         # ========================= Student's code ends here ===========================
 
-        node.move_arm(go_away)
-        node.get_logger().info("Task Completed. Press Ctrl+C to exit.")
-
-        while rclpy.ok():
-            rclpy.spin_once(node, timeout_sec=0.1)
+        if not node.move_arm(go_away):
+            raise RuntimeError("Could not return to the camera-clear position")
+        node.get_logger().info(
+            f"Task completed: stacked {placed_count} of {len(block_snapshot)} "
+            "yellow blocks"
+        )
 
     except KeyboardInterrupt:
         pass
+    except RuntimeError as exc:
+        node.get_logger().error(f"Task stopped: {exc}")
     finally:
+        cv2.destroyAllWindows()
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
