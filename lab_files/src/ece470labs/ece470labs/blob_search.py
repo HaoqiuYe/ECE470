@@ -14,24 +14,20 @@ ty = 0.0
 # Function that converts image coord to world coord
 def IMG2W(col, row):
     
-    or = 240
-    oc = 320
+    o_r = 240
+    o_c = 320
     beta = 600
-    xc_r = (row - or) / beta
-    yc_c = (col - oc) / beta
+    xc_r = (row - o_r) / beta
+    yc_c = (col - o_c) / beta
     tx = 0.192
     ty = 0.07
-    theta = 0.0996
+    theta = -0.0996
     
 
-    r
-    xw = 
-    yw = 
-    pass
+    r = np.array([[np.cos(theta),-np.sin(theta)],[np.sin(theta),np.cos(theta)]])
+    world = r @ np.array([xc_r, yc_c]) + np.array([tx,ty])
+    return [world[0],world[1]]
 
-
-
-    
 
 # ========================= Student's code ends here ===========================
 
