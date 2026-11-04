@@ -210,54 +210,71 @@ class UR3e(Node):
         if not np.isfinite([pick_above, pick, place_above, place]).all():
             raise RuntimeError("Pick or place position is outside the IK workspace")
 
-        def move_to(joints, description):
-            if not self.move_arm(joints):
-                raise RuntimeError(f"Could not {description}")
+        response = self.set_io(0, 0.0)
+        if response is None or not response.success:
+            raise RuntimeError("Could not set suction to 0.0")
 
-        def suction(state):
-            response = self.set_io(0, state)
-            if response is None or not response.success:
-                raise RuntimeError(f"Could not set suction to {state}")
+        if not self.move_arm(pick_above):
+            raise RuntimeError("Could not move above the pickup position")
+        if not self.move_arm(pick):
+            raise RuntimeError("Could not reach the pickup position")
 
-        def settle(seconds):
-            deadline = time.monotonic() + seconds
-            while rclpy.ok() and time.monotonic() < deadline:
-                rclpy.spin_once(self, timeout_sec=0.1)
-            if not rclpy.ok():
-                raise RuntimeError("ROS shut down during the block transfer")
-
-        suction(0.0)
-        move_to(pick_above, "move above the pickup position")
-        move_to(pick, "reach the pickup position")
-        suction(1.0)
+        response = self.set_io(0, 1.0)
+        if response is None or not response.success:
+            raise RuntimeError("Could not set suction to 1.0")
 
         # Require new feedback after suction starts; keep processing callbacks.
         self.analog_in_0_value = None
-        settle(2.0)
+        deadline = time.monotonic() + 2.0
+        while rclpy.ok() and time.monotonic() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.1)
+        if not rclpy.ok():
+            raise RuntimeError("ROS shut down during the block transfer")
+
         if self.analog_in_0_value is None:
-            suction(0.0)
+            response = self.set_io(0, 0.0)
+            if response is None or not response.success:
+                raise RuntimeError("Could not set suction to 0.0")
             raise RuntimeError("No gripper feedback received after enabling suction")
+
         if self.analog_in_0_value <= SUCTION_THRESHOLD:
             self.get_logger().error(
                 f"No block attached at ({start_x:.3f}, {start_y:.3f}); skipping it"
             )
-            suction(0.0)
-            move_to(pick_above, "retract after the missed pickup")
+            response = self.set_io(0, 0.0)
+            if response is None or not response.success:
+                raise RuntimeError("Could not set suction to 0.0")
+            if not self.move_arm(pick_above):
+                raise RuntimeError("Could not retract after the missed pickup")
             return False
 
-        move_to(pick_above, "lift the block above the pickup position")
+        if not self.move_arm(pick_above):
+            raise RuntimeError("Could not lift the block above the pickup position")
         if self.analog_in_0_value <= SUCTION_THRESHOLD:
             self.get_logger().error(
                 f"Block lost while lifting at ({start_x:.3f}, {start_y:.3f}); skipping it"
             )
-            suction(0.0)
+            response = self.set_io(0, 0.0)
+            if response is None or not response.success:
+                raise RuntimeError("Could not set suction to 0.0")
             return False
 
-        move_to(place_above, "move above the stack")
-        move_to(place, "lower the block onto the stack")
-        suction(0.0)
-        settle(0.5)
-        move_to(place_above, "retract above the stack")
+        if not self.move_arm(place_above):
+            raise RuntimeError("Could not move above the stack")
+        if not self.move_arm(place):
+            raise RuntimeError("Could not lower the block onto the stack")
+
+        response = self.set_io(0, 0.0)
+        if response is None or not response.success:
+            raise RuntimeError("Could not set suction to 0.0")
+        deadline = time.monotonic() + 0.5
+        while rclpy.ok() and time.monotonic() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.1)
+        if not rclpy.ok():
+            raise RuntimeError("ROS shut down during the block transfer")
+
+        if not self.move_arm(place_above):
+            raise RuntimeError("Could not retract above the stack")
         return True
         # ========================= Student's code ends here =========================
 
