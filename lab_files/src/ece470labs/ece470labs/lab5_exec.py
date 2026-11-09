@@ -31,7 +31,8 @@ home = np.radians([120, -90, 90, -90, -90, 0])
 go_away = [270*pi/180.0, -90*pi/180.0, 90*pi/180.0, -90*pi/180.0, -90*pi/180.0, 135*pi/180.0]
 
 # World-frame distances are in meters; lab_invk takes yaw in degrees.
-STACK_XY = (0.300, 0.050)
+YELLOW_STACK_XY = (0.300, 0.050)
+GREEN_STACK_XY = (0.300, 0.150)
 TABLE_Z = 0.0
 CUBE_HEIGHT = 0.031
 TRAVEL_Z = 0.180
@@ -61,8 +62,9 @@ class UR3e(Node):
         self.image_sub = self.create_subscription(Image, '/image_raw', self.image_callback, qos_profile_sensor_data)
 
         self.image_count = 0
-        # Store detected yellow block centers as world-frame (x, y) coordinates.
+        # Store detected block centers as world-frame (x, y) coordinates by color.
         self.yellow_blocks = []
+        self.green_blocks = []
 
 
         # State variables
@@ -106,6 +108,7 @@ class UR3e(Node):
 
         # Use your existing blob_search to detect block centers in world frame
         self.yellow_blocks = blob_search(cv_image, "yellow")
+        self.green_blocks = blob_search(cv_image, "green")
         self.image_count += 1
 
 
@@ -117,13 +120,15 @@ class UR3e(Node):
         req.state = state
         future = self.io_client.call_async(req)
         rclpy.spin_until_future_complete(self, future)
-        return future.result()
+        response = future.result()
+        if response is None or not response.success:
+            raise RuntimeError("Gripper command failed")
+        return response
 
 
     def move_arm(self, target):
         if self.current_joint_state is None:
-            self.get_logger().error("No joint state received!")
-            return False
+            raise RuntimeError("No joint state received")
 
         V_MAX = 1#2.09    # rad/s
         A_MAX = 0.8#2.79   # rad/s^2
@@ -187,7 +192,7 @@ class UR3e(Node):
             if all(delta < 0.001 for delta in deltas):
                 time.sleep(0.25)
                 return True
-        return False
+        raise RuntimeError("Arm did not reach the commanded position")
 
 
     def move_block_vision(self, start_xy, target_xyz):
@@ -202,7 +207,8 @@ class UR3e(Node):
         pick_z = TABLE_Z + CUBE_HEIGHT
         travel_z = max(TRAVEL_Z, target_z + 0.080)
 
-        # lab_invk already calls lab_fk to apply the controller angle offsets.
+        # Like Lab 2's mid, these high waypoints provide clearance before transfer
+        # and after release. Their (x, y) positions follow the detected block/stack.
         pick_above = lab_invk(start_x, start_y, travel_z, GRIPPER_YAW_DEG)
         pick = lab_invk(start_x, start_y, pick_z, GRIPPER_YAW_DEG)
         place_above = lab_invk(target_x, target_y, travel_z, GRIPPER_YAW_DEG)
@@ -210,18 +216,10 @@ class UR3e(Node):
         if not np.isfinite([pick_above, pick, place_above, place]).all():
             raise RuntimeError("Pick or place position is outside the IK workspace")
 
-        response = self.set_io(0, 0.0)
-        if response is None or not response.success:
-            raise RuntimeError("Could not set suction to 0.0")
-
-        if not self.move_arm(pick_above):
-            raise RuntimeError("Could not move above the pickup position")
-        if not self.move_arm(pick):
-            raise RuntimeError("Could not reach the pickup position")
-
-        response = self.set_io(0, 1.0)
-        if response is None or not response.success:
-            raise RuntimeError("Could not set suction to 1.0")
+        self.set_io(0, 0.0)
+        self.move_arm(pick_above)
+        self.move_arm(pick)
+        self.set_io(0, 1.0)
 
         # Require new feedback after suction starts; keep processing callbacks.
         self.analog_in_0_value = None
@@ -232,49 +230,30 @@ class UR3e(Node):
             raise RuntimeError("ROS shut down during the block transfer")
 
         if self.analog_in_0_value is None:
-            response = self.set_io(0, 0.0)
-            if response is None or not response.success:
-                raise RuntimeError("Could not set suction to 0.0")
+            self.set_io(0, 0.0)
             raise RuntimeError("No gripper feedback received after enabling suction")
 
         if self.analog_in_0_value <= SUCTION_THRESHOLD:
             self.get_logger().error(
                 f"No block attached at ({start_x:.3f}, {start_y:.3f}); skipping it"
             )
-            response = self.set_io(0, 0.0)
-            if response is None or not response.success:
-                raise RuntimeError("Could not set suction to 0.0")
-            if not self.move_arm(pick_above):
-                raise RuntimeError("Could not retract after the missed pickup")
+            self.set_io(0, 0.0)
+            self.move_arm(pick_above)
             return False
 
-        if not self.move_arm(pick_above):
-            raise RuntimeError("Could not lift the block above the pickup position")
+        self.move_arm(pick_above)
         if self.analog_in_0_value <= SUCTION_THRESHOLD:
             self.get_logger().error(
                 f"Block lost while lifting at ({start_x:.3f}, {start_y:.3f}); skipping it"
             )
-            response = self.set_io(0, 0.0)
-            if response is None or not response.success:
-                raise RuntimeError("Could not set suction to 0.0")
+            self.set_io(0, 0.0)
             return False
 
-        if not self.move_arm(place_above):
-            raise RuntimeError("Could not move above the stack")
-        if not self.move_arm(place):
-            raise RuntimeError("Could not lower the block onto the stack")
-
-        response = self.set_io(0, 0.0)
-        if response is None or not response.success:
-            raise RuntimeError("Could not set suction to 0.0")
-        deadline = time.monotonic() + 0.5
-        while rclpy.ok() and time.monotonic() < deadline:
-            rclpy.spin_once(self, timeout_sec=0.1)
-        if not rclpy.ok():
-            raise RuntimeError("ROS shut down during the block transfer")
-
-        if not self.move_arm(place_above):
-            raise RuntimeError("Could not retract above the stack")
+        self.move_arm(place_above)
+        self.move_arm(place)
+        self.set_io(0, 0.0)
+        time.sleep(0.5)
+        self.move_arm(place_above)
         return True
         # ========================= Student's code ends here =========================
 
@@ -299,8 +278,7 @@ def main(args=None):
             return
 
         # Move to go_away (your move_arm uses rclpy.spin_once internally)
-        if not node.move_arm(go_away):
-            raise RuntimeError("Could not move the robot out of the camera view")
+        node.move_arm(go_away)
 
         # Let vision settle for 5 seconds
         image_count_before_settle = node.image_count
@@ -313,29 +291,29 @@ def main(args=None):
             raise RuntimeError("No camera image received during the five-second wait")
 
         # ========================= Student's code starts here =========================
-        # Freeze the yellow block positions before the arm obscures the camera.
-        block_snapshot = [tuple(xy) for xy in node.yellow_blocks]
+        # Freeze both colors before either pass obscures the camera.
+        yellow_snapshot = list(node.yellow_blocks)
+        green_snapshot = list(node.green_blocks)
 
-        node.get_logger().info(f"Snapshot yellow blocks: {block_snapshot}")
         placed_count = 0
-        for start_xy in block_snapshot:
+        for start_xy in yellow_snapshot:
             # z is the suction-cup contact height at the top of the placed cube.
             target_z = TABLE_Z + (placed_count + 1) * CUBE_HEIGHT
-            target_xyz = (STACK_XY[0], STACK_XY[1], target_z)
+            target_xyz = (YELLOW_STACK_XY[0], YELLOW_STACK_XY[1], target_z)
             if node.move_block_vision(start_xy, target_xyz):
                 placed_count += 1
-                node.get_logger().info(
-                    f"Placed yellow block {placed_count} at {target_xyz}"
-                )
+
+        placed_count = 0
+        for start_xy in green_snapshot:
+            target_z = TABLE_Z + (placed_count + 1) * CUBE_HEIGHT
+            target_xyz = (GREEN_STACK_XY[0], GREEN_STACK_XY[1], target_z)
+            if node.move_block_vision(start_xy, target_xyz):
+                placed_count += 1
 
         # ========================= Student's code ends here ===========================
 
-        if not node.move_arm(go_away):
-            raise RuntimeError("Could not return to the camera-clear position")
-        node.get_logger().info(
-            f"Task completed: stacked {placed_count} of {len(block_snapshot)} "
-            "yellow blocks"
-        )
+        node.move_arm(go_away)
+        node.get_logger().info("Task completed")
 
     except KeyboardInterrupt:
         pass

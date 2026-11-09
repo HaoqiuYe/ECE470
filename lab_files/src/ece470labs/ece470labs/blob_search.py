@@ -75,7 +75,10 @@ def blob_search(image_raw, color):
     upper_g = (85,255,255)
 
     # Define a mask using the lower and upper bounds of the target color
-    mask_image = cv2.inRange(hsv_image, lower_y,upper_y)
+    if color == "yellow":
+        mask_image = cv2.inRange(hsv_image, lower_y, upper_y)
+    else:
+        mask_image = cv2.inRange(hsv_image, lower_g, upper_g)
 
     # ========================= Student's code ends here ===========================
 
