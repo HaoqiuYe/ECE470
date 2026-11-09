@@ -16,12 +16,12 @@ def IMG2W(col, row):
     
     o_r = 240
     o_c = 320
-    beta = 600
+    beta = 640
     xc_r = (row - o_r) / beta
     yc_c = (col - o_c) / beta
-    tx = 0.192
-    ty = 0.07
-    theta = -0.0996
+    tx = 0.217
+    ty = 0.158
+    theta = 0.124355 # -0.0996
     
 
     r = np.array([[np.cos(theta),-np.sin(theta)],[np.sin(theta),np.cos(theta)]])
@@ -71,15 +71,18 @@ def blob_search(image_raw, color):
     lower_y =(20, 175, 100)
     upper_y = (30, 255, 255)
 
-    lower_g = (35,50,50)
-    upper_g = (85,255,255)
+    # lower_g = (35,50,50)
+    # upper_g = (85,255,255)
+
+    lower_g = (40, 100, 100)  # Raised S and V from 50 to 100
+    upper_g = (80, 255, 255)  # Slightly narrowed Hue from 85 to 80
 
     # Define a mask using the lower and upper bounds of the target color
     if color == "yellow":
         mask_image = cv2.inRange(hsv_image, lower_y, upper_y)
     else:
         mask_image = cv2.inRange(hsv_image, lower_g, upper_g)
-
+    # mask_image = cv2.inRange(hsv_image, lower_g, upper_g)
     # ========================= Student's code ends here ===========================
 
     keypoints = detector.detect(mask_image)

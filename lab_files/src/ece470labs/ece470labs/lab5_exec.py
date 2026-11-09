@@ -34,7 +34,7 @@ go_away = [270*pi/180.0, -90*pi/180.0, 90*pi/180.0, -90*pi/180.0, -90*pi/180.0, 
 YELLOW_STACK_XY = (0.300, 0.050)
 GREEN_STACK_XY = (0.300, 0.150)
 TABLE_Z = 0.0
-CUBE_HEIGHT = 0.031
+CUBE_HEIGHT = 0.029
 TRAVEL_Z = 0.180
 GRIPPER_YAW_DEG = 0.0
 SUCTION_THRESHOLD = 2.0  # Same Analog Input 0 threshold used in Lab 2.
@@ -324,6 +324,59 @@ def main(args=None):
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
+
+
+# def main(args=None):
+#     input("Check if the UR3e is in 'Remote' Mode?\n\
+#     Check if the UR3e is initialized and in 'Normal' state.\n\
+#     Have you run the ROS2 launch statement?\n\
+#     If there was an UR3e emergency stop or error, Ctrl-C the ros2 launch and rerun.\n\
+#     \n\
+#     Press <Enter> to Continue.")
+#     rclpy.init(args=args)
+#     node = UR3e()
+
+#     try:
+#         # Wait for joint state updates
+#         while rclpy.ok() and node.current_joint_state is None:
+#             rclpy.spin_once(node, timeout_sec=0.1)
+
+#         # Move to go_away (your move_arm uses rclpy.spin_once internally)
+#         node.move_arm(go_away)
+
+#         # Let vision settle for 5 seconds
+#         settle_start = time.time()
+#         while rclpy.ok() and (time.time() - settle_start < 5.0):
+#             rclpy.spin_once(node, timeout_sec=0.1)
+
+#         # Snapshot once 
+#         green_snapshot = list(node.green_blocks)
+#         node.get_logger().info(f"Snapshot green blocks: {green_snapshot}")
+
+#         # Execute task once based on snapshot
+#         # ========================= Student's code starts here =========================
+
+#         """
+#         TODO: Use the vision-detected block positions to move blocks around. 
+#         Hints: use the found green_blocks, yellow_blocks to move the blocks correspondingly. You will
+#         need to call move_block_vision(start_xy, target_xyz) where start_xy is the world coordinate of 
+#         the block you want to move, and target_xyz is the world coordinate of where you want to place it 
+#         (you can set z based on your needs).
+#         """
+
+#         # ========================= Student's code ends here ===========================
+
+#         node.move_arm(go_away)
+#         node.get_logger().info("Task Completed. Press Ctrl+C to exit.")
+
+#         while rclpy.ok():
+#             rclpy.spin_once(node, timeout_sec=0.1)
+
+#     except KeyboardInterrupt:
+#         pass
+#     finally:
+#         node.destroy_node()
+#         rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
