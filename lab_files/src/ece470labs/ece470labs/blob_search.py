@@ -19,8 +19,13 @@ def IMG2W(col, row):
     beta = 640
     xc_r = (row - o_r) / beta
     yc_c = (col - o_c) / beta
+
+    # ty = (o_c-228)/beta
+    # tx = (o_r-91)/beta 
+    
     tx = 0.217
-    ty = 0.158
+    ty = 0.16
+    
     theta = 0.124355 # -0.0996
     
 
